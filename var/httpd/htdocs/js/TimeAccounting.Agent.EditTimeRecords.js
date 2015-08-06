@@ -167,6 +167,9 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
             if (TargetNS.Autocompletion) {
                 InitAutoCompletion(Language);
             }
+
+            // Modernize fields
+            Core.UI.InputFields.Activate($('.WorkingHours'));
         });
     }
 
