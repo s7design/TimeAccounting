@@ -86,10 +86,15 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
 
     function InitAddRow() {
         $('#MoreInputFields').unbind('click.MoreInputFields').bind('click.MoreInputFields', function () {
+
+
             var $LastRow = $('#InsertWorkingHours tbody tr.WorkingHours:last'),
-                $NewRow = $LastRow.clone(),
-                NewRowHTML = $NewRow.html(),
+                $NewRow,NewRowHTML,
                 RecordNumber = parseInt($('#RecordsNumber').val(), 10) + 1;
+
+            Core.UI.InputFields.Deactivate($('.WorkingHours'));
+            $NewRow = $LastRow.clone();
+            NewRowHTML = $NewRow.html();
 
             // Now take the last row and replace all numbers with the new record number
             NewRowHTML = NewRowHTML.replace(/ProjectID[0-9]+/g, 'ProjectID' + RecordNumber);
@@ -106,19 +111,9 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
             NewRowHTML = NewRowHTML.replace(/Period[0-9]+/g, 'Period' + RecordNumber);
             NewRowHTML = NewRowHTML.replace(/Period\[[0-9]+/g, 'Period[' + RecordNumber);
 
+
             // Now write this HTML back to the jquery object
             $NewRow.html(NewRowHTML);
-
-            // Remove Input field container, which will be re-initiated later
-            $NewRow
-                .find('.InputField_Container').remove();
-
-            // Set visibility of select to variable,
-            // that should be activated in Core.UI.InputFields.InitSelect
-            $NewRow
-                .find('select').css("visibility", "visible");
-            $NewRow
-                .find('select').css("display", "block");
 
             // If last row contained values, these must be removed
             $NewRow
