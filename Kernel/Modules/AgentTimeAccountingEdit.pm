@@ -757,7 +757,6 @@ sub Run {
     $ErrorIndex = 0;
 
     # build units
-    $Param{"JSProjectList"} = "var JSProjectList = new Array();\n";
     for my $ID ( 1 .. $Param{RecordsNumber} ) {
         $Param{ID} = $ID;
         my $UnitRef   = $Units[$ID];
@@ -779,19 +778,6 @@ sub Run {
             || $ServerErrorData{$ErrorIndex}{ProjectID}
             || '';
         $Param{ProjectName} = '';
-
-        # generate JavaScript array which will be output to the template
-        my @JSProjectList;
-        for my $Project ( @{ $ProjectList->{AllProjects} }, @{ $ProjectList->{OldProjects} } ) {
-            push @JSProjectList,
-                '{id:' . ( $Project->{Key} || '0' ) . ' , name:\'' . $Project->{Value} . '\'}';
-
-            if ( $Project->{Key} eq $Param{ProjectID} ) {
-                $Param{ProjectName} = $Project->{Value};
-            }
-        }
-        $Param{"JSProjectList"}
-            .= "JSProjectList[$ID] = [" . ( join ', ', @JSProjectList ) . "];\n";
 
         $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
             Data        => $ProjectList->{AllProjects},
@@ -1183,9 +1169,6 @@ sub Run {
 
     # integrate the handling for required remarks in relation to projects
     $Param{RemarkRegExp} = $Self->_Project2RemarkRegExp();
-
-    # enable auto-completion?
-    $Param{EnableAutocompletion} = $ConfigObject->Get("TimeAccounting::EnableAutoCompletion");
 
     # build output
     my $Output = $LayoutObject->Header(

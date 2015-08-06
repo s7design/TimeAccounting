@@ -84,40 +84,7 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
     };
 
 
-    function InitAutoCompletion(Language) {
-        // Initialize ComboBox on Project dropdown
-        Core.UI.ComboBox.Init('.ProjectSelection', {
-            Class: "Validate_TimeAccounting_Project",
-            Lang: {
-                ShowAllItems: Language.ShowAllItems,
-                InputTitle: Language.ProjectTitle
-            }
-        });
-        // Initialize ComboBox on task dropdown
-        Core.UI.ComboBox.Init('.ActionSelection', {
-            Class: "Validate_DependingRequiredAND",
-            Lang: {
-                ShowAllItems: Language.ShowAllItems,
-                InputTitle: Language.TaskTitle
-            }
-        });
-        // Add special validation class to ActionSelection
-        $('.ActionSelection').next('input:text').each(function () {
-            var ID = this.id.replace('Combo_ActionID', '');
-            $(this).addClass('Validate_Depending_Combo_ProjectID' + ID);
-        });
-        // Remove validation classes from underlying select
-        $('.ProjectSelection').removeClass('Validate_TimeAccounting_Project');
-        $('.ActionSelection').removeClass('Validate_DependingRequiredAND');
-
-        // Copy ServerError classes to according comboboxes
-        $('.ProjectSelection.ServerError').next('input[id^=Combo_]').addClass('ServerError');
-        $('.ActionSelection.ServerError').next('input[id^=Combo_]').addClass('ServerError');
-
-        Core.Form.Validate.Init();
-    }
-
-    function InitAddRow(Language) {
+    function InitAddRow() {
         $('#MoreInputFields').unbind('click.MoreInputFields').bind('click.MoreInputFields', function () {
             var $LastRow = $('#InsertWorkingHours tbody tr.WorkingHours:last'),
                 $NewRow = $LastRow.clone(),
@@ -142,15 +109,21 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
             // Now write this HTML back to the jquery object
             $NewRow.html(NewRowHTML);
 
+            // Remove Input field container, which will be re-initiated later
+            $NewRow
+                .find('.InputField_Container').remove();
+
+            // Set visibility of select to variable,
+            // that should be activated in Core.UI.InputFields.InitSelect
+            $NewRow
+                .find('select').css("visibility", "visible");
+            $NewRow
+                .find('select').css("display", "block");
+
             // If last row contained values, these must be removed
             $NewRow
                 .find('input:text').val('').end()
                 .find('select option').prop('selected', false);
-
-            // Remove autocompletion from this row (will be re-initiated later)
-            $NewRow
-                .find('input[id^=Combo_]').remove().end()
-                .find('button[id^=ComboBtn_]').remove();
 
             // Now add this row to the table
             $LastRow.after($NewRow);
@@ -162,11 +135,6 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
             $('#InsertWorkingHours tbody tr')
                 .removeClass('Even')
                 .filter(':odd').addClass('Even');
-
-            // Re-initiate autocompletion combobox
-            if (TargetNS.Autocompletion) {
-                InitAutoCompletion(Language);
-            }
 
             // Modernize fields
             Core.UI.InputFields.Activate($('.WorkingHours'));
@@ -267,23 +235,18 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
         });
     }
 
-    TargetNS.Autocompletion = true;
-
     /**
      * @name Init
      * @memberof TimeAccounting.Agent.EditTimeRecords
      * @function
      * @param {Object} Options the different possible options:
      *                  RemarkRegExpContent - the regular expression for the remark validation check
-     *                  Language - object with text translations
-     *                  Autocompletion - boolean
      * @description
      *      This function initializes all needed JS for the Edit screen
      */
     TargetNS.Init = function (Options) {
         var LocalOptions = Options || {},
             RemarkRegExpContent = LocalOptions.RemarkRegExpContent,
-            Language = LocalOptions.Language,
             // Add some special validation methods for the edit screen
             // Define all available elements (only the prefixes) in a row
             ElementPrefixes = ['ProjectID', 'ActionID', 'Remark', 'StartTime', 'EndTime', 'Period'];
@@ -376,14 +339,8 @@ TimeAccounting.Agent.EditTimeRecords = (function (TargetNS) {
             /*eslint-enable camelcase */
         });
 
-        // Enable autocompletion, if configured
-        TargetNS.Autocompletion = LocalOptions.Autocompletion;
-        if (LocalOptions.Autocompletion) {
-            InitAutoCompletion(Language);
-        }
-
         // initiate "more input fields" functionality
-        InitAddRow(Language);
+        InitAddRow();
 
         // initiate period calculation
         InitPeriodCalculation();
