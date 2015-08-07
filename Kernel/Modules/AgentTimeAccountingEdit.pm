@@ -786,6 +786,7 @@ sub Run {
         if (IsArrayRefWithData($ProjectList->{LastProjects})) {
             $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
                 Data        => \@Projects,
+                # Data =>     $ProjectList->{AllProjects}
                 Name        => "ProjectID[$ID]",
                 ID          => "ProjectID$ID",
                 Sort        => 'NumericKey',
@@ -794,6 +795,13 @@ sub Run {
                     . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
                 OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
                 Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+                # Filters  => {
+                #     LastProjects => {
+                #         Name   => $LayoutObject->{LanguageObject}->Translate('Previous Project'),
+                #         Values => $ProjectList->{LastProjects},
+                #         Active => 1,
+                #     },
+                # },
             );
         } else {
             $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
@@ -806,6 +814,7 @@ sub Run {
                     . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
                 OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
                 Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+
             );
         }
 
