@@ -14,6 +14,8 @@ use warnings;
 use Date::Pcalc qw(Today Days_in_Month Day_of_Week Add_Delta_YMD check_date);
 use Time::Local;
 
+use Kernel::System::VariableCheck qw(:all);
+
 our $ObjectManagerDisabled = 1;
 
 sub new {
@@ -779,22 +781,33 @@ sub Run {
             || '';
         $Param{ProjectName} = '';
 
-        $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
-            Data        => $ProjectList->{AllProjects},
-            Name        => "ProjectID[$ID]",
-            ID          => "ProjectID$ID",
-            Translation => 0,
-            Class       => 'Modernize Validate_TimeAccounting_Project ProjectSelection '
-                . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
-            OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
-            Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
-            Filters  => {
-                OldProjects => {
-                    Name   => $LayoutObject->{LanguageObject}->Translate('Previous Project'),
-                    Values => $ProjectList->{OldProjects},
-                },
-            },
-        );
+        my @Projects = ( @{ $ProjectList->{LastProjects} }, @{ $ProjectList->{AllProjects} } );
+
+        if (IsArrayRefWithData($ProjectList->{LastProjects})) {
+            $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
+                Data        => \@Projects,
+                Name        => "ProjectID[$ID]",
+                ID          => "ProjectID$ID",
+                Sort        => 'NumericKey',
+                Translation => 0,
+                Class       => 'Modernize Validate_TimeAccounting_Project ProjectSelection '
+                    . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
+                OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
+                Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+            );
+        } else {
+            $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
+                Data        => $ProjectList->{AllProjects},
+                Name        => "ProjectID[$ID]",
+                ID          => "ProjectID$ID",
+                Sort        => 'NumericKey',
+                Translation => 0,
+                Class       => 'Modernize Validate_TimeAccounting_Project ProjectSelection '
+                    . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
+                OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
+                Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+            );
+        }
 
         # action list initially only contains empty and selected element as well as elements
         #    configured for selected project
@@ -1360,20 +1373,23 @@ sub _ProjectList {
     if ( !$Self->{LastProjectsRef} ) {
 
         # get the last projects
-        my @LastProjects = $TimeAccountingObject->LastProjectsOfUser(
+        my @LastProjectsOfUser = $TimeAccountingObject->LastProjectsOfUser(
             UserID => $Self->{UserID},
         );
 
         # add the favorites
-        %{ $Self->{LastProjectsRef} } = map { $_ => 1 } @LastProjects;
+        %{ $Self->{LastProjectsRef} } = map { $_ => 1 } @LastProjectsOfUser;
     }
 
-    my @OldProjects = (
-        {
-            Key   => '',
-            Value => '',
-        },
-    );
+    my @LastProjects;
+    if ( IsHashRefWithData($Self->{LastProjectsRef}) ){
+        @LastProjects = (
+            {
+                Key   => '',
+                Value => '',
+            },
+        );
+    }
 
     PROJECTID:
     for my $ProjectID (
@@ -1386,22 +1402,20 @@ sub _ProjectList {
             Key   => $ProjectID,
             Value => $Project{Project}{$ProjectID},
         );
-        push @OldProjects, \%Hash;
+        push @LastProjects, \%Hash;
 
-        # at the moment it is not possible mark the selected project
-        # in the favorite list (I think a bug in Build selection?!)
     }
 
-    @OldProjects = $Self->_ProjectListConstraints(
-        List       => \@OldProjects,
+    @LastProjects = $Self->_ProjectListConstraints(
+        List       => \@LastProjects,
         SelectedID => $Param{SelectedID} || '',
     );
 
     # add all allowed projects to the list
     my @AllProjects = (
         {
-            Key   => '',
-            Value => '',
+            Key   => '-',
+            Value => '-',
         },
     );
     PROJECTID:
@@ -1428,7 +1442,7 @@ sub _ProjectList {
     );
 
     my %Projects = (
-        OldProjects => \@OldProjects,
+        LastProjects => \@LastProjects,
         AllProjects => \@AllProjects,
     );
 
