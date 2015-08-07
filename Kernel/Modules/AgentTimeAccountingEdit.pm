@@ -14,6 +14,8 @@ use warnings;
 use Date::Pcalc qw(Today Days_in_Month Day_of_Week Add_Delta_YMD check_date);
 use Time::Local;
 
+use Kernel::System::VariableCheck qw(:all);
+
 our $ObjectManagerDisabled = 1;
 
 sub new {
@@ -757,7 +759,6 @@ sub Run {
     $ErrorIndex = 0;
 
     # build units
-    $Param{"JSProjectList"} = "var JSProjectList = new Array();\n";
     for my $ID ( 1 .. $Param{RecordsNumber} ) {
         $Param{ID} = $ID;
         my $UnitRef   = $Units[$ID];
@@ -780,29 +781,42 @@ sub Run {
             || '';
         $Param{ProjectName} = '';
 
-        # generate JavaScript array which will be output to the template
-        my @JSProjectList;
-        for my $Project ( @{$ProjectList} ) {
-            push @JSProjectList,
-                '{id:' . ( $Project->{Key} || '0' ) . ' , name:\'' . $Project->{Value} . '\'}';
+        my @Projects = ( @{ $ProjectList->{LastProjects} }, @{ $ProjectList->{AllProjects} } );
 
-            if ( $Project->{Key} eq $Param{ProjectID} ) {
-                $Param{ProjectName} = $Project->{Value};
-            }
+        if (IsArrayRefWithData($ProjectList->{LastProjects})) {
+            $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
+                Data        => \@Projects,
+                # Data =>     $ProjectList->{AllProjects}
+                Name        => "ProjectID[$ID]",
+                ID          => "ProjectID$ID",
+                Sort        => 'NumericKey',
+                Translation => 0,
+                Class       => 'Modernize Validate_TimeAccounting_Project ProjectSelection '
+                    . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
+                OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
+                Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+                # Filters  => {
+                #     LastProjects => {
+                #         Name   => $LayoutObject->{LanguageObject}->Translate('Previous Project'),
+                #         Values => $ProjectList->{LastProjects},
+                #         Active => 1,
+                #     },
+                # },
+            );
+        } else {
+            $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
+                Data        => $ProjectList->{AllProjects},
+                Name        => "ProjectID[$ID]",
+                ID          => "ProjectID$ID",
+                Sort        => 'NumericKey',
+                Translation => 0,
+                Class       => 'Modernize Validate_TimeAccounting_Project ProjectSelection '
+                    . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
+                OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
+                Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
+
+            );
         }
-        $Param{"JSProjectList"}
-            .= "JSProjectList[$ID] = [" . ( join ', ', @JSProjectList ) . "];\n";
-
-        $Frontend{ProjectOption} = $LayoutObject->BuildSelection(
-            Data        => $ProjectList,
-            Name        => "ProjectID[$ID]",
-            ID          => "ProjectID$ID",
-            Translation => 0,
-            Class       => 'Validate_TimeAccounting_Project ProjectSelection '
-                . ( $Errors{$ErrorIndex}{ProjectIDInvalid} || '' ),
-            OnChange => "TimeAccounting.Agent.EditTimeRecords.FillActionList($ID);",
-            Title    => $LayoutObject->{LanguageObject}->Translate("Project"),
-        );
 
         # action list initially only contains empty and selected element as well as elements
         #    configured for selected project
@@ -835,7 +849,7 @@ sub Run {
             Name        => "ActionID[$ID]",
             ID          => "ActionID$ID",
             Translation => 0,
-            Class       => 'Validate_DependingRequiredAND Validate_Depending_ProjectID'
+            Class       => 'Modernize Validate_DependingRequiredAND Validate_Depending_ProjectID'
                 . $ID
                 . ' ActionSelection '
                 . ( $Errors{$ErrorIndex}{ActionIDInvalid} || '' ),
@@ -1128,6 +1142,7 @@ sub Run {
                 PossibleNone => 1,
                 Title =>
                     $LayoutObject->{LanguageObject}->Translate("Incomplete Working Days"),
+                Class => 'Modernize',
             );
 
             $LayoutObject->Block(
@@ -1177,9 +1192,6 @@ sub Run {
 
     # integrate the handling for required remarks in relation to projects
     $Param{RemarkRegExp} = $Self->_Project2RemarkRegExp();
-
-    # enable auto-completion?
-    $Param{EnableAutocompletion} = $ConfigObject->Get("TimeAccounting::EnableAutoCompletion");
 
     # build output
     my $Output = $LayoutObject->Header(
@@ -1359,14 +1371,6 @@ sub _ActionListConstraints {
 sub _ProjectList {
     my ( $Self, %Param ) = @_;
 
-    # at first a empty line
-    my @List = (
-        {
-            Key   => '',
-            Value => '',
-        },
-    );
-
     # get time accounting object
     my $TimeAccountingObject = $Kernel::OM->Get('Kernel::System::TimeAccounting');
 
@@ -1378,12 +1382,22 @@ sub _ProjectList {
     if ( !$Self->{LastProjectsRef} ) {
 
         # get the last projects
-        my @LastProjects = $TimeAccountingObject->LastProjectsOfUser(
+        my @LastProjectsOfUser = $TimeAccountingObject->LastProjectsOfUser(
             UserID => $Self->{UserID},
         );
 
         # add the favorites
-        %{ $Self->{LastProjectsRef} } = map { $_ => 1 } @LastProjects;
+        %{ $Self->{LastProjectsRef} } = map { $_ => 1 } @LastProjectsOfUser;
+    }
+
+    my @LastProjects;
+    if ( IsHashRefWithData($Self->{LastProjectsRef}) ){
+        @LastProjects = (
+            {
+                Key   => '',
+                Value => '',
+            },
+        );
     }
 
     PROJECTID:
@@ -1397,20 +1411,22 @@ sub _ProjectList {
             Key   => $ProjectID,
             Value => $Project{Project}{$ProjectID},
         );
-        push @List, \%Hash;
+        push @LastProjects, \%Hash;
 
-        # at the moment it is not possible mark the selected project
-        # in the favorite list (I think a bug in Build selection?!)
     }
 
-    # add the separator
-    push @List, {
-        Key      => '0',
-        Value    => '--------------------',
-        Disabled => 1,
-    };
+    @LastProjects = $Self->_ProjectListConstraints(
+        List       => \@LastProjects,
+        SelectedID => $Param{SelectedID} || '',
+    );
 
     # add all allowed projects to the list
+    my @AllProjects = (
+        {
+            Key   => '-',
+            Value => '-',
+        },
+    );
     PROJECTID:
     for my $ProjectID (
         sort { $Project{Project}{$a} cmp $Project{Project}{$b} }
@@ -1426,15 +1442,20 @@ sub _ProjectList {
             $Hash{Selected} = 1;
         }
 
-        push @List, \%Hash;
+        push @AllProjects, \%Hash;
     }
 
-    @List = $Self->_ProjectListConstraints(
-        List       => \@List,
+    @AllProjects = $Self->_ProjectListConstraints(
+        List       => \@AllProjects,
         SelectedID => $Param{SelectedID} || '',
     );
 
-    return \@List;
+    my %Projects = (
+        LastProjects => \@LastProjects,
+        AllProjects => \@AllProjects,
+    );
+
+    return \%Projects;
 }
 
 sub _ProjectListConstraints {
