@@ -220,7 +220,7 @@
         <Group>TimeAccounting</Group>
         <SubGroup>Frontend::Agent::TimeAccounting::ViewSetting</SubGroup>
         <Setting>
-            <String Regex="">2015-01-01</String>
+            <String Regex="">2016-01-01</String>
         </Setting>
     </ConfigItem>
     <ConfigItem Name="TimeAccounting::DefaultUserDateEnd" Required="1" Valid="1">
@@ -228,7 +228,7 @@
         <Group>TimeAccounting</Group>
         <SubGroup>Frontend::Agent::TimeAccounting::ViewSetting</SubGroup>
         <Setting>
-            <String Regex="">2015-12-31</String>
+            <String Regex="">2016-12-31</String>
         </Setting>
     </ConfigItem>
     <ConfigItem Name="TimeAccounting::DefaultUserDescription" Required="1" Valid="1">
